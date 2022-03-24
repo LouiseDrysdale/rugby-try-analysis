@@ -1,0 +1,181 @@
+---
+title: "rugby-try-analysis-markdown"
+author: "Louise Drysdale"
+date: "23/03/2022"
+output:
+  prettydoc::html_pretty:
+    theme: leonids
+    highlight: github
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r include=FALSE}
+library(tinytex)
+```
+```{r include=FALSE}
+library(prettydoc)
+```
+
+
+## R Markdown Rugby Try Analysis
+
+Here I go! 
+
+```{r read in rubgy-try-analysis file}
+X2017_super_rugby_try_source_data <- read.csv("data/raw/2017_super-rugby_try-source-data.csv")
+```
+
+Credit to Molly for this really cool data 
+
+Coughlan, Mountifield, Sharpe & Mara, 2019. How they scored the tries: applying cluster analysis to identify playing patterns that lead to tries in super rugby. IJPAS
+
+## Don't forget to load ggplot2 and the Tidyverse
+
+
+```{r load tidyverse }
+library(tidyverse)
+```
+
+and this one
+
+```{r load ggplot2}
+library(ggplot2)
+```
+
+
+Now let's name this object something easier to work with
+
+```{r load try data}
+try_data <- X2017_super_rugby_try_source_data
+```
+
+Cool. Now let's search for missing data
+
+```{r find missing values}
+which(is.na(try_data))
+```
+
+So that tells us missing values are an integer(0)...
+
+## Ok, let's explore and plot!
+
+Which team scored the most tries?
+
+```{r tries per attacking team}
+ggplot(data = try_data) + geom_bar(mapping = aes(x = attacking_team), colour = "deeppink4", fill = "deeppink2") + theme(axis.text = element_text(angle = 45))
+```
+
+Rugby is pretty in pinks and corals, especially when you know which minute of the game the tries were scored
+
+```{r tries by game time}
+ggplot(data = try_data, aes(x = game_time)) + geom_histogram(mapping = aes(y = ..density..), binwidth = 2, fill = "coral1", colour = "coral4") + geom_density(alpha = 0.3, fill = "cornflowerblue")
+```
+
+With a nice density layer just to be sure I know to what point of the game I should fast forward Stan to to see the tries... 
+
+
+What about the final phase before the try was scored (I think)?
+
+```{r final source}
+ggplot(data = try_data) + geom_bar(mapping = aes(x = final_source), colour = "deeppink4", fill = "deeppink2") + theme(axis.text = element_text(angle = 45))
+```
+NOw let's aquamarine queen the possession zone!
+
+```{r}
+ggplot(data = try_data) + geom_bar(mapping = aes(x = possession_zone), colour = "aquamarine3", fill = "aquamarine4")
+```
+This one is a little boring sadly, couldn't get it to colour for me, but here is the try by time from source
+
+```{r}
+ggplot(data = try_data) + geom_freqpoly(aes(x = time_from_source, colour = try_no))
+```
+
+## OK, now for some interesting relationship investigation
+
+I'm a part Reds fan, part Waratahs fan (born in NSW, live 1km away from Ballymore). So I want to know which is the most common try source by each attacking team! So then I know once I see them do one of those I should stop fastforwarding the game on Stan.
+
+```{r}
+try_data %>% filter(attacking_team == "Reds") %>% ggplot() + geom_bar(mapping = aes(x = try_source), fill = "darkred")
+```
+
+Lineouts are trending in Brisvegas 2017!
+
+Now for the 'Tahs. Better make them blue, like David McDuling's eyes
+
+```{r}
+try_data %>% filter(attacking_team == "Waratahs") %>% ggplot() + geom_bar(mapping = aes(x = try_source), fill = "deepskyblue")
+```
+
+Waratahs don't mind a lineout either. I also like lineouts. They are the closest thing to pas de deux I get to see when I go to the rugby. 
+
+Is this just an Aussie thing, though. What about the NZ teams. My understanding is that Aussie teams are constantly being beaten by NZ teams, so maybe we should take note of their tactics...
+
+How about the Crusaders. Dad always gets excited when the Crusaders play, so they must be a good team. 
+
+```{r}
+try_data %>% filter(attacking_team == "Crusaders") %>% ggplot() + geom_bar(mapping = aes(x = try_source), fill = "red", colour = "black")
+```
+
+Well, how about that! Also lineouts. But scrums and kick receipts are the next most common. Tricky stuff. Can you tell I know nothing about rugby?
+
+Ok, so what if I wanted to know about the team that takes the least number of phases from possession to score. Surely that means they are efficient? Or perhaps that is also very dependent on the defence. Maybe I am missing the point of rugby and it is an enjoyable thing for most people to watch many phases of play between possession and a try being scored.  
+
+## Number of Phases from Possession to Score
+
+```{r}
+try_data %>% group_by(attacking_team) %>% ggplot() + geom_bar(mapping = aes(x = attacking_team), fill = "brown3") + theme(axis.text = element_text(angle = 45))
+```
+
+## Trying some other functions
+
+```{r mean passes test}
+try_data %>% summarise(mean(passes))
+```
+
+Mean passes 4.19
+
+And then we can count the number of possessions in each zone before try
+
+```{r}
+try_data %>% count(possession_zone)
+```
+
+A is the most frequent, within 22m try line. Makes sense. So what If I want to know which team take possession of the ball within the 22m try line before scoring, most often? 
+
+```{r group and count}
+ try_data %>% group_by(attacking_team) %>% count(possession_zone)
+```
+
+Cool. Well that output is a bit funny. Let's make a new data frame and pivot it!
+
+```{r which team is taking possession and where}
+possession_zone_attacking_team <-  try_data %>% group_by(attacking_team) %>% count(possession_zone)
+```
+
+```{r new dataframe}
+View(possession_zone_attacking_team)
+```
+
+Yeah, it's too long. So, could pivot wide. But don't forget there is now that new sneaky value that is "n" that needs to go in as the value, not the other variable name, otherwise something very odd pops out. 
+
+```{r pivot wide}
+possession_zone_attacking_team_wide <-  pivot_wider(possession_zone_attacking_team, names_from = "possession_zone", values_from = "n")
+```
+
+```{r}
+View(possession_zone_attacking_team_wide)
+```
+
+
+Ok, now let's see who takes possession and scores from which zone! Now, what you did before by making that last data wide was take the variable name away, which means creating a plot is really tricky. Probably easier to keep it long with all the variable names in the columns to create a plot and for it to be "tidy" data. Like this...
+
+## Which zone do teams take possession in before scoring a try?
+
+```{r}
+try_data %>% count(attacking_team, possession_zone) %>% group_by(attacking_team) %>% mutate(prop = round(prop.table(n),1)) %>% ggplot() + geom_bar(mapping = aes(x = attacking_team, y = prop, fill = possession_zone), stat= "identity") + theme(axis.text = element_text(angle = 45))
+```
+Ok, well, that's enought from me, folks! I hope this works :)
+
+
